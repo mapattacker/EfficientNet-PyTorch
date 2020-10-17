@@ -2,6 +2,7 @@ import os
 import json
 from PIL import Image
 
+import matplotlib.pyplot as plt
 import torch
 from torchvision import transforms
 
@@ -28,7 +29,23 @@ def get_file_list(folder, file_extensions):
     return sorted(file_list)
 
 
+
 def predict(model, alllabels, superclasslabels, search, imgpath, topk=1):
+    """find images that do not belong to a superclass
+    
+    Args
+    ----
+    model (str): name of efficientnet model
+    alllabels (json): imagenet class number to name mapping
+    superclasslabels (json): imagenet class number to superclass name mapping (self-defined)
+    search (str): name of superclass
+    imgpath (str): path of image
+    topk (int): number of results ranked by probability score
+
+    Returns
+    -------
+    imgname (str): imgpath what does not belong to superclass
+    """
     model_name = model
     image_size = EfficientNet.get_image_size(model_name)
 
@@ -55,25 +72,31 @@ def predict(model, alllabels, superclasslabels, search, imgpath, topk=1):
         imgname = imgpath.split("/")[-1]
         prob = torch.softmax(logits, dim=1)[0, idx].item()
         if idx in superclass:
-            print("{} is bird ({:.2f}%)".format(imgname, prob*100))
+            pass
         else:
-            print("{} is NOT bird ({:.2f}%)".format(imgname, prob*100))
+            print("{} is NOT {} ({:.2f}%)".format(imgname, search, prob*100))
+    return imgpath
+
+
+def human_in_loop(imgfolder, model, labels, superclass, search):
+    birdlist = get_file_list(imgfolder, ("jpeg", "png", "bmp"))
+    notbird_list = []
+    for image in birdlist:
+        imgpath = os.path.join(imgfolder, image)
+        notbird = predict(model, labels, superclass, search, imgpath)
+        notbird_list.append(notbird)
+
+    for imgpath in notbird_list:
+        plt.imshow(image, interpolation='nearest')
+        _ = input("Press [enter] to continue.")
+        plt.close()
 
 
 if __name__ == "__main__":
-    folder = "/Users/siyang/Desktop/birdpics/Black-capped Kingfisher"
-    birdlist = get_file_list(folder, ("jpeg", "png", "bmp"))
-
+    imgfolder = "birdpics/Black-capped Kingfisher"
     model='efficientnet-b0'
     labels = "labels/labels_map.json"
     superclass = "labels/superclass.json"
     search = "birds"
-    imgpath = "/Users/siyang/Desktop/birdpics/Black-capped Kingfisher/Baidu_Black-capped_Kingfisher_00084.png"
-    predict(model, labels, superclass, search, imgpath)
-    # for image in birdlist:
-    #     imgpath = os.path.join(folder, image)
-    #     predict(model, labels, superclass, search, imgpath)
-
-    import cv2
-    img = cv2.imread(imgpath).shape
-    print(img)
+    human_in_loop(imgfolder, model, labels, superclass, search)
+    
