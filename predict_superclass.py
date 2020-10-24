@@ -2,6 +2,7 @@ import os
 import json
 from PIL import Image
 
+import cv2
 import matplotlib.pyplot as plt
 import torch
 from torchvision import transforms
@@ -57,7 +58,7 @@ def predict(model, alllabels, superclasslabels, search, imgpath, topk=1):
     img = tfms(img).unsqueeze(0)
 
     # Load class names & superclass name to search
-    labels_map = json.load(open(labels))
+    labels_map = json.load(open(alllabels))
     labels_map = [labels_map[str(i)] for i in range(1000)]
     superclass = json.load(open(superclasslabels))[search]
 
@@ -75,28 +76,58 @@ def predict(model, alllabels, superclasslabels, search, imgpath, topk=1):
             pass
         else:
             print("{} is NOT {} ({:.2f}%)".format(imgname, search, prob*100))
-    return imgpath
+            return imgpath
 
 
-def human_in_loop(imgfolder, model, labels, superclass, search):
+def transfer_file(filepath, dst_dir):
+    """transfer file to another folder"""
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+
+    filename = filepath.split("/")[-1]
+    destination = os.path.join(dst_dir, filename)
+    os.rename(filepath, destination)
+
+
+def remove_non_class(imgfolder):
+    """copy images which does not belong to superclass to another folder"""
     birdlist = get_file_list(imgfolder, ("jpeg", "png", "bmp"))
-    notbird_list = []
     for image in birdlist:
         imgpath = os.path.join(imgfolder, image)
-        notbird = predict(model, labels, superclass, search, imgpath)
-        notbird_list.append(notbird)
+        notbird = predict(model, alllabels, superclasslabels, search, imgpath, topk=1)
+        if notbird:
+            transfer_file(imgpath, dst_dir)
 
-    for imgpath in notbird_list:
-        plt.imshow(image, interpolation='nearest')
-        _ = input("Press [enter] to continue.")
-        plt.close()
+
+def show_image(imgpath):
+    """display image"""
+    image = Image.open(imgpath)
+    title = imgpath.split("/")[-1]
+    plt.imshow(image, interpolation='nearest')
+    plt.title(title)
+    plt.axis('off')
+    plt.show()
+    _ = input("Press [enter] to continue.")
+    plt.close()
+
+
+def human_in_loop(imgfolder):
+    birdlist = get_file_list(imgfolder, ("jpeg", "png", "bmp"))
+    for image in birdlist:
+        imgpath = os.path.join(imgfolder, image)
+        show_image(imgpath)
 
 
 if __name__ == "__main__":
-    imgfolder = "birdpics/Black-capped Kingfisher"
+    imgfolder = "birdpics/White-throated Kingfisher"
     model='efficientnet-b0'
-    labels = "labels/labels_map.json"
-    superclass = "labels/superclass.json"
+    alllabels = "labels/labels_map.json"
+    superclasslabels = "labels/superclass.json"
     search = "birds"
-    human_in_loop(imgfolder, model, labels, superclass, search)
+    dst_dir = "birdpics/notbird"
+    human_in_loop(imgfolder)
+
     
+
+    # imgpath = "birdpics/Black-capped Kingfisher/Baidu_Black-capped_Kingfisher_00098.jpeg"
+    # verify_img(imgpath)
